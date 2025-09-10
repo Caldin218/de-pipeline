@@ -1,0 +1,2 @@
+apache-airflow-providers-apache-spark==4.0.1
+pyfiglet==1.0.2

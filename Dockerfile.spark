@@ -1,0 +1,19 @@
+FROM bitnami/spark:3.5.0
+
+# Làm sạch build layer
+WORKDIR /app
+
+# Copy requirements sớm để leverage Docker cache
+COPY requirements.txt .
+
+# Install Python libs vào global site-packages (không bị /.local)
+USER root
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt --prefix=/usr/local
+
+# Copy mã ETL và config
+COPY pipelines/ ./pipelines/
+COPY configs/ ./configs/
+
+# Chuyển về user non-root (bitnami mặc định có user 1001)
+USER 1001

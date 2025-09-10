@@ -1,0 +1,159 @@
+# VERSION: 2025-09-08 prod-spark
+# Transform -> Spark (Parquet + partition + S3/S3A)
+import os
+import argparse
+import yaml
+from pyspark.sql import SparkSession, functions as F
+
+# ----------------------------
+# Config & helpers
+# ----------------------------
+# Giữ đúng đường dẫn config như ingest.py (tối thiểu thay đổi)
+CFG = yaml.safe_load(open("/opt/airflow/dags/pipelines/configs/config.yaml", "r", encoding="utf-8"))
+BRONZE = str(CFG["paths"]["bronze"])      # ví dụ: s3://bucket/bronze hoặc /data/bronze
+SILVER  = str(CFG["paths"]["silver"])     # ví dụ: s3://bucket/silver hoặc /data/silver
+REF     = str(CFG["paths"]["reference"])  # ví dụ: s3://bucket/reference hoặc /data/reference
+
+def to_s3a(path: str) -> str:
+    """Nếu path là s3://... -> chuyển thành s3a://... để Spark đọc/ghi."""
+    return path.replace("s3://", "s3a://") if path.startswith("s3://") else path
+
+BRONZE = to_s3a(BRONZE)
+SILVER = to_s3a(SILVER)
+REF    = to_s3a(REF)
+
+# ----------------------------
+# Runtime args (RUN_DATE)
+# ----------------------------
+parser = argparse.ArgumentParser()
+parser.add_argument("--run_date", required=False, help="YYYY-MM-DD, ưu tiên hơn RUN_DATE env nếu truyền")
+args = parser.parse_args()
+RUN_DATE = args.run_date or os.getenv("RUN_DATE", None)  # Airflow: --run_date {{ ds }}
+
+# ----------------------------
+# Spark session
+# (các conf S3 nên đã có ở spark-defaults hoặc trong DAG operator)
+# ----------------------------
+spark = (
+    SparkSession.builder.appName("TransformPipeline")
+    .config("spark.sql.sources.partitionOverwriteMode", "dynamic")
+    .getOrCreate()
+)
+
+# ----------------------------
+# READ (CSV) từ bronze & reference
+# ----------------------------
+orders = (
+    spark.read.option("header", True).option("inferSchema", True)
+    .csv(f"{BRONZE}/orders_*.csv")
+    .withColumn("order_ts", F.to_timestamp("order_ts"))
+)
+events = (
+    spark.read.option("header", True).option("inferSchema", True)
+    .csv(f"{BRONZE}/events_*.csv")
+    .withColumn("ts", F.to_timestamp("ts"))
+)
+users = (
+    spark.read.option("header", True).option("inferSchema", True)
+    .csv(f"{REF}/users.csv")
+)
+
+# Filter theo RUN_DATE nếu có
+if RUN_DATE:
+    orders = orders.filter(F.to_date("order_ts") == F.lit(RUN_DATE))
+    events = events.filter(F.to_date("ts") == F.lit(RUN_DATE))
+
+# Chuẩn hoá kiểu dữ liệu
+orders = orders.withColumn("user_id", F.col("user_id").cast("int"))
+events = events.withColumn("user_id", F.col("user_id").cast("int"))
+
+# ----------------------------
+# TRANSFORM (giữ đúng 6 chỉ số bạn đang tính)
+# ----------------------------
+
+# 1) Daily orders
+daily_orders = (
+    orders.withColumn("order_date", F.to_date("order_ts"))
+          .groupBy("order_date")
+          .agg(
+              F.countDistinct("order_id").alias("orders"),
+              F.countDistinct("user_id").alias("buyers"),
+              F.sum("amount").alias("revenue"),
+          )
+)
+
+# 2) Daily revenue per user
+daily_revenue = (
+    orders.withColumn("order_date", F.to_date("order_ts"))
+          .groupBy("order_date", "user_id")
+          .agg(F.sum("amount").alias("revenue"))
+)
+
+# 3) Daily active users
+dau = (
+    events.withColumn("event_date", F.to_date("ts"))
+          .groupBy("event_date")
+          .agg(F.countDistinct("user_id").alias("dau"))
+)
+
+# 4) DAU by channel
+ev_u = (
+    events.withColumn("event_date", F.to_date("ts"))
+          .select("event_date", "user_id").dropDuplicates()
+          .join(users.select("user_id", "channel"), on="user_id", how="left")
+)
+dau_ch = (
+    ev_u.groupBy("event_date", "channel")
+        .agg(F.countDistinct("user_id").alias("dau"))
+)
+
+# 5) Revenue by channel
+ord_u = (
+    orders.withColumn("order_date", F.to_date("order_ts"))
+          .select("order_date", "user_id", "amount")
+          .join(users.select("user_id", "channel"), on="user_id", how="left")
+)
+rev_ch = (
+    ord_u.groupBy("order_date", "channel")
+         .agg(F.sum("amount").alias("revenue"))
+)
+
+# 6) Conversion rate (buyers / dau)
+conv = (
+    dau.join(
+        daily_orders.select(F.col("order_date").alias("date"), "buyers"),
+        dau.event_date == F.col("date"),
+        how="left",
+    )
+    .select(
+        F.col("event_date").alias("date"),
+        "dau",
+        F.coalesce("buyers", F.lit(0)).alias("buyers"),
+    )
+    .withColumn("conv_rate", (F.col("buyers") / F.col("dau")).cast("double"))
+)
+
+# ----------------------------
+# WRITE (Parquet + partition + snappy)
+# ----------------------------
+tables = [
+    (daily_orders, "daily_orders",                  "order_date"),
+    (daily_revenue, "daily_revenue",                "order_date"),
+    (dau, "daily_active_users",                     "event_date"),
+    (dau_ch, "daily_active_users_by_channel",       "event_date"),
+    (rev_ch, "daily_revenue_by_channel",            "order_date"),
+    (conv, "daily_conversion",                      "date"),
+]
+
+for df, name, part_col in tables:
+    (
+        df.write
+          .mode("overwrite")              # với dynamic -> chỉ overwrite partition tương ứng
+          .format("parquet")
+          .partitionBy(part_col)
+          .option("compression", "snappy")
+          .save(f"{SILVER}/{name}")
+)
+
+print(f"[transform] wrote PARQUET silver to {SILVER} for RUN_DATE={RUN_DATE or 'ALL'}")
+spark.stop()

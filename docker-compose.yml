@@ -1,0 +1,126 @@
+version: "3.8"
+
+x-airflow-common: &airflow-common
+  build:
+    context: .
+    dockerfile: Dockerfile.airflow
+  env_file:
+    - .env
+  environment:
+    - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+    - AIRFLOW__CORE__FERNET_KEY=p1clVccI-tx_A5zRIaTrE0tjywtMT0A12TWJBuj5U44=
+    - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=false
+    - AIRFLOW__CORE__LOAD_EXAMPLES=false
+    - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+    - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
+  volumes:
+    - ./airflow/dags:/opt/airflow/dags
+    - ./airflow/logs:/opt/airflow/logs
+    - ./airflow/plugins:/opt/airflow/plugins
+    - ./pipelines:/opt/airflow/dags/pipelines
+    - ./data:/app/data
+    - ./jars:/opt/bitnami/spark/extra-jars
+    - ./configs:/opt/airflow/configs
+    - ./spark-events:/tmp/spark-events
+  depends_on:
+    - postgres
+  networks:
+    - de-network
+
+services:
+  postgres:
+    image: postgres:14
+    container_name: airflow-postgres
+    environment:
+      - POSTGRES_USER=airflow
+      - POSTGRES_PASSWORD=airflow
+      - POSTGRES_DB=airflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./airflow/db-data:/var/lib/postgresql/data
+    networks:
+      - de-network
+
+  airflow-webserver:
+    <<: *airflow-common
+    container_name: airflow-webserver
+    command: webserver
+    ports:
+      - "8080:8080"
+    restart: always
+
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: airflow-scheduler
+    command: scheduler
+    restart: always
+
+  spark-master:
+    image: de-spark:3.5.0
+    container_name: spark-master
+    env_file:
+      - .env
+    environment:
+      - SPARK_MODE=master
+      - SPARK_MASTER_WEBUI_PORT=8081
+      - SPARK_EXTRA_CLASSPATH=/opt/bitnami/spark/extra-jars/*
+      - SPARK_EVENTLOG_ENABLED=true
+      - SPARK_EVENTLOG_DIR=file:///tmp/spark-events
+    ports:
+      - "7077:7077"
+      - "8081:8081"
+    volumes:
+      - ./jars:/opt/bitnami/spark/extra-jars
+      - ./data:/app/data
+      - ./airflow/dags/pipelines:/opt/airflow/dags/pipelines
+      - ./configs:/opt/airflow/configs
+      - ./spark-events:/tmp/spark-events
+    networks:
+      - de-network
+
+  spark-worker:
+    image: de-spark:3.5.0
+    container_name: spark-worker
+    env_file:
+      - .env
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_WORKER_WEBUI_PORT=8082
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_EXTRA_CLASSPATH=/opt/bitnami/spark/extra-jars/*
+      - SPARK_HISTORY_OPTS=-Dspark.history.fs.logDirectory=/tmp/spark-events -Dspark.history.ui.port=18080
+      - SPARK_EVENTLOG_ENABLED=true
+      - SPARK_EVENTLOG_DIR=file:///tmp/spark-events
+    ports:
+      - "8082:8082"
+    depends_on:
+      - spark-master
+    volumes:
+      - ./jars:/opt/bitnami/spark/extra-jars
+      - ./data:/app/data
+      - ./pipelines:/opt/airflow/dags/pipelines
+      - ./configs:/opt/airflow/configs
+      - ./spark-events:/tmp/spark-events
+    networks:
+      - de-network
+
+  spark-history:
+    image: bitnami/spark:3.5.0
+    container_name: spark-history
+    environment:
+      - SPARK_HISTORY_OPTS=-Dspark.history.fs.logDirectory=/tmp/spark-events -Dspark.history.ui.port=18080
+    command: >
+      bash -c "
+        /opt/bitnami/spark/bin/spark-class org.apache.spark.deploy.history.HistoryServer
+      "
+    ports:
+      - "18080:18080"
+    volumes:
+      - ./spark-events:/tmp/spark-events
+    networks:
+      - de-network
+
+networks:
+  de-network:
+    driver: bridge

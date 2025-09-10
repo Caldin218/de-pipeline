@@ -1,0 +1,42 @@
+version: "3"
+
+services:
+ spark-master:
+  image: bitnami/spark:latest
+  container_name: spark-master
+  environment:
+    - SPARK_MODE=master
+  ports:
+    - "8081:8080"   # Spark Master UI
+    - "7077:7077"   # RPC
+
+
+  spark-worker:
+    image: bitnami/spark:3.5.0
+    container_name: spark-worker
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_MEMORY=1G
+      - SPARK_WORKER_CORES=1
+    depends_on:
+      - spark-master
+
+  pipeline:
+    build: .
+    container_name: de-pipeline
+    volumes:
+      - ./data:/app/data
+      - ./configs:/app/configs
+      - ./pipelines:/app/pipelines
+    environment:
+      - AWS_PROFILE=de-pipeline-user
+      - AWS_REGION=ap-southeast-1
+    depends_on:
+      - spark-master
+      - spark-worker
+    command: >
+      spark-submit
+      --master spark://spark-master:7077
+      --deploy-mode client
+      pipelines/transform_spark.py

@@ -1,0 +1,91 @@
+version: '3.8'
+
+x-airflow-common: &airflow-common
+  build:
+    context: .
+    dockerfile: Dockerfile.airflow
+  environment:
+    - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+    - AIRFLOW__CORE__FERNET_KEY=p1clVccI-tx_A5zRIaTrE0tjywtMT0A12TWJBuj5U44=
+    - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=false
+    - AIRFLOW__CORE__LOAD_EXAMPLES=false
+    - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+    - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+    - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+    - AWS_REGION=${AWS_REGION}
+  volumes:
+    - ./airflow/dags:/opt/airflow/dags          # DAGs + pipelines ở đây
+    - ./airflow/logs:/opt/airflow/logs
+    - ./pipelines:/opt/airflow/dags/pipelines
+    - ./airflow/plugins:/opt/airflow/plugins
+    - ./configs:/opt/airflow/configs
+    - ./data:/opt/airflow/data
+    - ./data:/app/data
+    - ./jars:/opt/bitnami/spark/extra-jars      # airflow cũng thấy jars
+  depends_on:
+    - postgres
+  networks:
+    - de-network
+
+services:
+  postgres:
+    image: postgres:14
+    container_name: airflow-postgres
+    environment:
+      - POSTGRES_USER=airflow
+      - POSTGRES_PASSWORD=airflow
+      - POSTGRES_DB=airflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./airflow/db-data:/var/lib/postgresql/data
+    networks:
+      - de-network
+
+  airflow-webserver:
+    <<: *airflow-common
+    container_name: airflow-webserver
+    command: webserver
+    ports:
+      - "8080:8080"
+    restart: always
+
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: airflow-scheduler
+    command: scheduler
+    restart: always
+
+  spark-master:
+    image: bitnami/spark:3.5.0
+    container_name: spark-master
+    environment:
+      - SPARK_MODE=master
+      - SPARK_EXTRA_CLASSPATH=/opt/bitnami/spark/extra-jars/*
+    ports:
+      - "7077:7077"
+      - "8081:8080"
+    volumes:
+      - ./jars:/opt/bitnami/spark/extra-jars
+      - ./data:/app/data
+    networks:
+      - de-network
+
+  spark-worker:
+    image: bitnami/spark:3.5.0
+    container_name: spark-worker
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_EXTRA_CLASSPATH=/opt/bitnami/spark/extra-jars/*
+    depends_on:
+      - spark-master
+    volumes:
+      - ./jars:/opt/bitnami/spark/extra-jars
+      - ./data:/app/data
+    networks:
+      - de-network
+
+networks:
+  de-network:
+    external: true

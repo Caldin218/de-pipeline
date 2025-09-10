@@ -1,0 +1,62 @@
+warehouse:
+  type: sqlite
+  database: data/warehouse.sqlite
+
+paths:
+  raw: /app/data/raw
+  bronze: /app/data/bronze
+  silver: s3a://de-pipeline-test-853409708/silver
+  reference: /app/data/reference
+
+pipeline:
+  days_back: 7
+
+quality_rules:
+  orders:
+    - name: non_null_order_id
+      column: order_id
+      check: not_null
+    - name: positive_amount
+      column: amount
+      check: gt_zero
+  users:
+    - name: unique_user_id
+      column: user_id
+      check: unique
+
+# Cấu hình thêm cho cloud
+gcp_project: ${GCP_PROJECT}
+bq_dataset: ${BQ_DATASET}
+bq_location: ${BQ_LOCATION}
+
+# AWS S3 config
+s3:
+  bucket: de-pipeline-test-853409708
+  raw_prefix: processed/
+
+
+spark_conf:
+  spark.hadoop.fs.s3a.impl: org.apache.hadoop.fs.s3a.S3AFileSystem
+  spark.hadoop.fs.s3a.aws.credentials.provider: com.amazonaws.auth.EnvironmentVariableCredentialsProvider
+  spark.hadoop.fs.s3a.endpoint: s3.ap-southeast-1.amazonaws.com
+  spark.hadoop.fs.s3a.path.style.access: "true"   # an toàn, cứ bật
+
+  # ĐẨY ENV xuống driver + executors (khớp với Compose)
+  spark.driverEnv.AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+  spark.driverEnv.AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+  spark.driverEnv.AWS_REGION: ${AWS_REGION}
+
+  # ĐẨY ENV xuống executors (khớp với Compose)
+  spark.executorEnv.AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+  spark.executorEnv.AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+  spark.executorEnv.AWS_REGION: ${AWS_REGION}  # dùng AWS_REGION
+  # (giữ thêm dòng này nếu ông thích – nhưng phải có giá trị)
+  # spark.executorEnv.AWS_DEFAULT_REGION: ${AWS_REGION}
+
+  # Timeout/retry giữ nguyên
+  spark.hadoop.fs.s3a.connection.timeout: "60000"
+  spark.hadoop.fs.s3a.connection.request.timeout: "5000"
+  spark.hadoop.fs.s3a.connection.establish.timeout: "5000"
+  spark.hadoop.fs.s3a.socket.timeout: "60000"
+  spark.hadoop.fs.s3a.attempts.maximum: "3"
+  spark.hadoop.fs.s3a.retry.limit: "3"

@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Logs & tmp
+*.log
+logs/
+airflow/logs/
+spark-events/
+
+# Data
+data/
+artifacts/
+warehouse.sqlite
+
+# Env & secrets
+.env
+*.key
+*.pem
+aws/
+
+# IDE/OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Ignore Airflow Postgres DB files
+airflow/db-data/
+airflow/logs/
+spark-events/
+
+# Ignore data folders
+data/
+artifacts/
+
+# Ignore heavy jar files
+jars/
