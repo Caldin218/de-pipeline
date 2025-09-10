@@ -53,9 +53,9 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           source: |
-            airflow/dags/**
-            pipelines/**
-            configs/**
+            airflow/dags
+            pipelines
+            configs
           target: /home/${{ secrets.SERVER_USER }}/airflow-deploy/
 
       # 🔄 Restart Airflow bằng lệnh cp thủ công
