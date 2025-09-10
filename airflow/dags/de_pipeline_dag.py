@@ -141,3 +141,5 @@ with DAG(
 
     # Task dependencies
     ingest_raw >> run_transform >> quality_checks >> load_to_s3
+
+    #..
