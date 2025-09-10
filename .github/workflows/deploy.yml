@@ -1,0 +1,59 @@
+name: Deploy Airflow DAGs
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "dags/**"
+      - "pipelines/**"
+      - "configs/**"
+      - "docker/**"
+      - "docker-compose.yml"
+      - ".env.example"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Lint DAGs & Pipelines
+        run: |
+          pip install flake8 pytest apache-airflow
+          flake8 dags/ pipelines/ || true
+          airflow dags list || true
+
+      # Copy DAGs, pipelines, configs lên server qua SSH
+      - name: Copy DAGs to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          source: |
+            dags/*
+            pipelines/*
+            configs/*
+          target: /home/${{ secrets.SERVER_USER }}/airflow-deploy/
+
+      # Restart Airflow trên server
+      - name: Restart Airflow services
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            cd /home/${{ secrets.SERVER_USER }}/airflow-deploy/
+            docker compose cp dags/. airflow-webserver:/opt/airflow/dags/
+            docker compose cp pipelines/. airflow-webserver:/opt/airflow/dags/pipelines/
+            docker compose cp configs/. airflow-webserver:/opt/airflow/configs/
+            docker compose restart airflow-webserver airflow-scheduler
