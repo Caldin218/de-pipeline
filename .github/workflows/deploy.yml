@@ -18,49 +18,64 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 🧾 Clone source code
       - name: Checkout repo
         uses: actions/checkout@v3
 
+      # 🐍 Setup Python 3.11
       - name: Set up Python 3.11
         uses: actions/setup-python@v4
         with:
           python-version: "3.11"
 
-      - name: Install lint dependencies
+      # ✅ Install lint/test dependencies
+      - name: Install dependencies
         run: |
           pip install flake8 pytest
 
-      - name: Lint Python files
+      # 🧹 Run flake8 lint (không fail nếu lỗi style)
+      - name: Run flake8 lint
         run: |
           flake8 airflow/dags/ pipelines/ configs/
         continue-on-error: true
 
-      - name: Run pytest (basic tests)
+      # ✅ Run pytest (basic tests)
+      - name: Run unit tests
         run: |
           pytest -q --disable-warnings
         continue-on-error: true
 
-      - name: Copy DAGs and configs to server
+      # 🚀 Copy files to EC2 (via SCP)
+      - name: Upload DAGs and configs to EC2 server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           source: |
-            airflow/dags/**/*
+            airflow/dags/**
             pipelines/**
-            airflow/configs/**/*
+            configs/**
           target: /home/${{ secrets.SERVER_USER }}/airflow-deploy/
 
-      - name: Restart Airflow services
+      # 🔄 Restart Airflow bằng lệnh cp thủ công
+      - name: Restart Airflow & sync files
         uses: appleboy/ssh-action@v0.1.10
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            cd /home/${{ secrets.SERVER_USER }}/airflow-deploy/
-            docker compose cp airflow/dags/. airflow-webserver:/opt/airflow/dags/
-            docker compose cp pipelines/. airflow-webserver:/opt/airflow/dags/pipelines/
-            docker compose cp configs/. airflow-webserver:/opt/airflow/configs/
+            set -e
+            cd /home/${{ secrets.SERVER_USER }}
+
+            echo "🧹 Sync DAGs and configs..."
+            cp -r airflow-deploy/airflow/dags/* airflow/dags/
+            cp -r airflow-deploy/pipelines/* airflow/dags/pipelines/
+            cp -r airflow-deploy/configs/* airflow/configs/
+
+            echo "🔄 Restarting Airflow..."
+            cd airflow
             docker compose restart airflow-webserver airflow-scheduler
+
+            echo "✅ Deployment finished!"
