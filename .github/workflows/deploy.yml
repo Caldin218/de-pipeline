@@ -1,89 +1,37 @@
-name: Deploy Airflow DAGs
+- name: Restart Airflow & sync files
+  uses: appleboy/ssh-action@v0.1.10
+  with:
+    host: ${{ secrets.SERVER_HOST }}
+    username: ${{ secrets.SERVER_USER }}
+    key: ${{ secrets.SERVER_SSH_KEY }}
+    script: |
+      set -e
+      cd /home/${{ secrets.SERVER_USER }}
 
-on:
-  push:
-    branches:
-      - main
-    paths:
-      - "airflow/dags/**"
-      - "pipelines/**"
-      - "configs/**"
-      - "docker/**"
-      - "docker-compose.yml"
-      - ".env.example"
-  workflow_dispatch:
+      echo "🧹 Sync DAGs and configs..."
+      mkdir -p airflow/dags airflow/dags/pipelines airflow/configs
+      cp -r airflow-deploy/airflow/dags/* airflow/dags/ || true
+      cp -r airflow-deploy/pipelines/* airflow/dags/pipelines/ || true
+      cp -r airflow-deploy/configs/* airflow/configs/ || true
 
-jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
+      echo "🛠 Generate .env from GitHub Secrets..."
+      cd /home/${{ secrets.SERVER_USER }}/airflow-deploy
+      cat > .env <<EOL
+      AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION=${{ secrets.AWS_REGION }}
+      S3_BUCKET=${{ secrets.S3_BUCKET }}
+      SLACK_WEBHOOK_URL=${{ secrets.SLACK_WEBHOOK_URL }}
+      AIRFLOW__SMTP__SMTP_HOST=${{ secrets.AIRFLOW__SMTP__SMTP_HOST }}
+      AIRFLOW__SMTP__SMTP_STARTTLS=${{ secrets.AIRFLOW__SMTP__SMTP_STARTTLS }}
+      AIRFLOW__SMTP__SMTP_SSL=${{ secrets.AIRFLOW__SMTP__SMTP_SSL }}
+      AIRFLOW__SMTP__SMTP_USER=${{ secrets.AIRFLOW__SMTP__SMTP_USER }}
+      AIRFLOW__SMTP__SMTP_PASSWORD=${{ secrets.AIRFLOW__SMTP__SMTP_PASSWORD }}
+      AIRFLOW__SMTP__SMTP_PORT=${{ secrets.AIRFLOW__SMTP__SMTP_PORT }}
+      AIRFLOW__SMTP__SMTP_MAIL_FROM=${{ secrets.AIRFLOW__SMTP__SMTP_MAIL_FROM }}
+      EOL
 
-    steps:
-      # 🧾 Clone source code
-      - name: Checkout repo
-        uses: actions/checkout@v3
+      echo "🔄 Restarting Airflow..."
+      docker-compose restart airflow-webserver airflow-scheduler
 
-      # 🐍 Setup Python 3.11
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.11"
-
-      # ✅ Install lint/test dependencies
-      - name: Install dependencies
-        run: |
-          pip install flake8 pytest
-
-      # 🧹 Run flake8 lint (không fail nếu lỗi style)
-      - name: Run flake8 lint
-        run: |
-          flake8 airflow/dags/ pipelines/ configs/
-        continue-on-error: true
-
-      # ✅ Run pytest (basic tests)
-      - name: Run unit tests
-        run: |
-          pytest -q --disable-warnings
-        continue-on-error: true
-
-      # 🔍 Debug file paths
-      - name: Debug files in repo
-        run: |
-          echo "=== airflow/dags ==="
-          ls -R airflow/dags || true
-          echo "=== pipelines ==="
-          ls -R pipelines || true
-          echo "=== configs ==="
-          ls -R configs || true
-
-      # 🚀 Copy files to EC2 (via SCP)
-      - name: Upload DAGs and configs to EC2 server
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          source: "airflow/dags/*,pipelines/*,configs/*,docker-compose.yml"
-          target: /home/${{ secrets.SERVER_USER }}/airflow-deploy/
-
-      # 🔄 Restart Airflow bằng lệnh cp thủ công
-      - name: Restart Airflow & sync files
-        uses: appleboy/ssh-action@v0.1.10
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          script: |
-            set -e
-            cd /home/${{ secrets.SERVER_USER }}
-
-            echo "🧹 Sync DAGs and configs..."
-            mkdir -p airflow/dags airflow/dags/pipelines airflow/configs
-            cp -r airflow-deploy/airflow/dags/* airflow/dags/ || true
-            cp -r airflow-deploy/pipelines/* airflow/dags/pipelines/ || true
-            cp -r airflow-deploy/configs/* airflow/configs/ || true
-
-            echo "🔄 Restarting Airflow..."
-            cd /home/${{ secrets.SERVER_USER }}/airflow-deploy
-            docker-compose restart airflow-webserver airflow-scheduler
-
-            echo "✅ Deployment finished!"
+      echo "✅ Deployment finished!"
