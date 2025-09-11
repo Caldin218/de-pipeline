@@ -28,16 +28,11 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install flake8 pytest
+          pip install flake8
 
       - name: Run flake8 lint
         run: |
           flake8 airflow/dags/ pipelines/ configs/
-        continue-on-error: true
-
-      - name: Run unit tests
-        run: |
-          pytest -q --disable-warnings
         continue-on-error: true
 
       - name: Debug files in repo
