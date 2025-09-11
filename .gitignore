@@ -37,3 +37,4 @@ artifacts/
 
 # Ignore heavy jar files
 jars/
+keys/de-pipeline-user_accessKeys___2___.csv
