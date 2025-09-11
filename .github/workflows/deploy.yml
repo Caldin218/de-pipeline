@@ -83,10 +83,10 @@ jobs:
             AIRFLOW__SMTP__SMTP_MAIL_FROM=${{ secrets.AIRFLOW__SMTP__SMTP_MAIL_FROM }}
             EOL
 
-            echo "🔍 Check Docker Compose version..."
-            docker compose version
-
             echo "🔄 Restarting Airflow..."
             docker compose restart airflow-webserver airflow-scheduler
+
+            echo "🔍 Check containers..."
+            docker compose ps
 
             echo "✅ Deployment finished!"

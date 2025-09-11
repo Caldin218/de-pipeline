@@ -7,7 +7,7 @@ from utils.alerts import slack_alert
 
 # ========================= 222===========================================
 # Default arguments
-# =============================
+# ====================================
 default_args = {
     "owner": "airflow",
     "retries": 1,
