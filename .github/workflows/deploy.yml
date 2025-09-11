@@ -62,7 +62,7 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          source: "airflow/dags/*,pipelines/*,configs/*"
+          source: "airflow/dags/*,pipelines/*,configs/*,docker-compose.yml"
           target: /home/${{ secrets.SERVER_USER }}/airflow-deploy/
 
       # 🔄 Restart Airflow bằng lệnh cp thủ công
@@ -83,7 +83,7 @@ jobs:
             cp -r airflow-deploy/configs/* airflow/configs/ || true
 
             echo "🔄 Restarting Airflow..."
-            cd airflow
-            docker compose restart airflow-webserver airflow-scheduler
+            cd /home/${{ secrets.SERVER_USER }}/airflow-deploy
+            docker-compose restart airflow-webserver airflow-scheduler
 
             echo "✅ Deployment finished!"
