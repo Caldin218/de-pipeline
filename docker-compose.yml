@@ -1,14 +1,11 @@
 version: "3.8"
 
 x-airflow-common: &airflow-common
-  build:
-    context: .
-    dockerfile: Dockerfile.airflow
   env_file:
     - .env
   environment:
     - AIRFLOW__CORE__EXECUTOR=LocalExecutor
-    - AIRFLOW__CORE__FERNET_KEY=p1clVccI-tx_A5zRIaTrE0tjywtMT0A12TWJBuj5U44=
+    - AIRFLOW__CORE__FERNET_KEY=${FERNET_KEY}
     - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=false
     - AIRFLOW__CORE__LOAD_EXAMPLES=false
     - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
@@ -26,6 +23,7 @@ x-airflow-common: &airflow-common
     - postgres
   networks:
     - de-network
+  restart: unless-stopped
 
 services:
   postgres:
@@ -38,23 +36,34 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - ./airflow/db-data:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
     networks:
       - de-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
+      interval: 10s
+      retries: 5
 
   airflow-webserver:
+    image: de-airflow-webserver:2.8.1
     <<: *airflow-common
     container_name: airflow-webserver
     command: webserver
     ports:
       - "8080:8080"
-    restart: always
+    environment:
+      - AIRFLOW__WEBSERVER__WEB_SERVER_HOST=0.0.0.0
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 30s
+      retries: 5
 
   airflow-scheduler:
+    image: de-airflow-scheduler:2.8.1
     <<: *airflow-common
     container_name: airflow-scheduler
     command: scheduler
-    restart: always
 
   spark-master:
     image: de-spark:3.5.0
@@ -120,6 +129,9 @@ services:
       - ./spark-events:/tmp/spark-events
     networks:
       - de-network
+
+volumes:
+  pgdata:
 
 networks:
   de-network:
