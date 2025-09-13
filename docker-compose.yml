@@ -52,7 +52,6 @@ services:
       - "8080:8080"
     environment:
       - AIRFLOW__WEBSERVER__WEB_SERVER_HOST=0.0.0.0
-      - AIRFLOW__CORE__FERNET_KEY=${FERNET_KEY}
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
       interval: 30s
