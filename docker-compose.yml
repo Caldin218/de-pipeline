@@ -19,8 +19,6 @@ x-airflow-common: &airflow-common
     - ./jars:/opt/bitnami/spark/extra-jars
     - ./configs:/opt/airflow/configs
     - ./spark-events:/tmp/spark-events
-  depends_on:
-    - postgres
   networks:
     - de-network
   restart: unless-stopped
@@ -46,8 +44,8 @@ services:
       retries: 5
 
   airflow-webserver:
-    image: de-airflow-webserver:2.8.1
     <<: *airflow-common
+    image: de-airflow-webserver:2.8.1
     container_name: airflow-webserver
     command: webserver
     ports:
@@ -60,8 +58,8 @@ services:
       retries: 5
 
   airflow-scheduler:
-    image: de-airflow-scheduler:2.8.1
     <<: *airflow-common
+    image: de-airflow-scheduler:2.8.1
     container_name: airflow-scheduler
     command: scheduler
 
@@ -87,6 +85,7 @@ services:
       - ./spark-events:/tmp/spark-events
     networks:
       - de-network
+    restart: unless-stopped
 
   spark-worker:
     image: de-spark:3.5.0
@@ -113,6 +112,7 @@ services:
       - ./spark-events:/tmp/spark-events
     networks:
       - de-network
+    restart: unless-stopped
 
   spark-history:
     image: bitnami/spark:3.5.0
@@ -129,6 +129,7 @@ services:
       - ./spark-events:/tmp/spark-events
     networks:
       - de-network
+    restart: unless-stopped
 
 volumes:
   pgdata:
