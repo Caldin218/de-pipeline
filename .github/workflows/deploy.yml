@@ -58,16 +58,15 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
             set -e
-            cd /home/${{ secrets.SERVER_USER }}
+            cd /home/${{ secrets.SERVER_USER }}/de-pipeline
 
             echo "🧹 Sync DAGs and configs..."
             mkdir -p airflow/dags airflow/dags/pipelines airflow/configs
-            cp -r airflow-deploy/airflow/dags/* airflow/dags/ || true
-            cp -r airflow-deploy/pipelines/* airflow/dags/pipelines/ || true
-            cp -r airflow-deploy/configs/* airflow/configs/ || true
+            cp -r ../airflow-deploy/airflow/dags/* airflow/dags/ || true
+            cp -r ../airflow-deploy/pipelines/* airflow/dags/pipelines/ || true
+            cp -r ../airflow-deploy/configs/* airflow/configs/ || true
 
             echo "🛠 Generate .env from GitHub Secrets..."
-            cd /home/${{ secrets.SERVER_USER }}/airflow-deploy
             cat > .env <<EOL
             AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
             AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -84,9 +83,10 @@ jobs:
             EOL
 
             echo "🔄 Restarting Airflow..."
-            docker compose restart airflow-webserver airflow-scheduler
+            docker-compose down -v
+            docker-compose up -d --build
 
             echo "🔍 Check containers..."
-            docker compose ps
+            docker-compose ps
 
             echo "✅ Deployment finished!"
