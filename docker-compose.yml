@@ -1,4 +1,4 @@
-version: "3.8"
+version: '3.8'
 
 x-airflow-common: &airflow-common
   env_file:
@@ -8,17 +8,18 @@ x-airflow-common: &airflow-common
     - AIRFLOW__CORE__FERNET_KEY=${FERNET_KEY}
     - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=false
     - AIRFLOW__CORE__LOAD_EXAMPLES=false
-    - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+    - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=${AIRFLOW__DATABASE__SQL_ALCHEMY_CONN}
     - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
   volumes:
     - ./airflow/dags:/opt/airflow/dags
-    - ./airflow/logs:/opt/airflow/logs
+    - airflow-logs:/opt/airflow/logs
     - ./airflow/plugins:/opt/airflow/plugins
     - ./pipelines:/opt/airflow/dags/pipelines
     - ./data:/app/data
     - ./jars:/opt/bitnami/spark/extra-jars
     - ./configs:/opt/airflow/configs
     - ./spark-events:/tmp/spark-events
+    - ./docker/airflow/entrypoint.sh:/entrypoint.sh
   networks:
     - de-network
   restart: unless-stopped
@@ -41,13 +42,15 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
       interval: 10s
-      retries: 5
+      retries: "5"
 
   airflow-webserver:
     <<: *airflow-common
     image: de-airflow-webserver:2.8.1
     container_name: airflow-webserver
+    entrypoint: ["/entrypoint.sh"]
     command: webserver
+    user: "50000:0"
     ports:
       - "8080:8080"
     environment:
@@ -55,15 +58,19 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
       interval: 30s
-      retries: 5
+      retries: "5"
 
   airflow-scheduler:
     <<: *airflow-common
-    image: de-airflow-scheduler:2.8.1
+    image: de-airflow-webserver:2.8.1
     container_name: airflow-scheduler
+    entrypoint: ["/entrypoint.sh"]
     command: scheduler
+    user: "50000:0"
 
   spark-master:
+    build:
+      context: ./docker/spark
     image: de-spark:3.5.0
     container_name: spark-master
     env_file:
@@ -88,6 +95,8 @@ services:
     restart: unless-stopped
 
   spark-worker:
+    build:
+      context: ./docker/spark
     image: de-spark:3.5.0
     container_name: spark-worker
     env_file:
@@ -120,9 +129,7 @@ services:
     environment:
       - SPARK_HISTORY_OPTS=-Dspark.history.fs.logDirectory=/tmp/spark-events -Dspark.history.ui.port=18080
     command: >
-      bash -c "
-        /opt/bitnami/spark/bin/spark-class org.apache.spark.deploy.history.HistoryServer
-      "
+      bash -c " /opt/bitnami/spark/bin/spark-class org.apache.spark.deploy.history.HistoryServer "
     ports:
       - "18080:18080"
     volumes:
@@ -133,6 +140,7 @@ services:
 
 volumes:
   pgdata:
+  airflow-logs:
 
 networks:
   de-network:

@@ -1,6 +1,7 @@
 FROM apache/airflow:2.8.1-python3.11
 
 USER root
+
 # Java + Spark
 RUN apt-get update && \
     apt-get install -y openjdk-17-jdk curl && \
@@ -9,12 +10,21 @@ RUN apt-get update && \
     | tar -xz -C /opt/ && \
     ln -s /opt/spark-3.5.0-bin-hadoop3 /opt/spark
 
+# ✅ FIX LOG PERMISSION: tạo thư mục logs & chown cho airflow user (50000)
+RUN mkdir -p /opt/airflow/logs && \
+    chown -R 50000:0 /opt/airflow/logs && \
+    chmod -R 775 /opt/airflow/logs
+
 ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 ENV PATH="${JAVA_HOME}/bin:/opt/spark/bin:${PATH}"
 
 # Copy requirements
 COPY requirements-airflow.txt /requirements.txt
 
-# Đổi user trước khi cài pip
+# Đổi sang user airflow để cài pip package
 USER airflow
 RUN pip install --no-cache-dir --no-deps -r /requirements.txt
+
+# Copy custom entrypoint
+COPY docker/airflow/entrypoint.sh /opt/airflow/entrypoint.sh
+RUN chmod +x /opt/airflow/entrypoint.sh
