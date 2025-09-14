@@ -68,7 +68,8 @@ services:
 
   spark-master:
     build:
-      context: ./docker/spark
+      context: .
+      dockerfile: ./docker/spark/Dockerfile  
     image: de-spark:3.5.0
     container_name: spark-master
     env_file:
@@ -94,7 +95,8 @@ services:
 
   spark-worker:
     build:
-      context: ./docker/spark
+      context: .
+      dockerfile: ./docker/spark/Dockerfile
     image: de-spark:3.5.0
     container_name: spark-worker
     env_file:
