@@ -1,25 +1,23 @@
-version: '3.8'
-
 x-airflow-common: &airflow-common
   env_file:
     - .env
   environment:
     - AIRFLOW__CORE__EXECUTOR=LocalExecutor
-    - AIRFLOW__CORE__FERNET_KEY=${FERNET_KEY}
+    - AIRFLOW__CORE__FERNET_KEY=${FERNET_KEY}  
     - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=false
     - AIRFLOW__CORE__LOAD_EXAMPLES=false
     - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=${AIRFLOW__DATABASE__SQL_ALCHEMY_CONN}
     - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
   volumes:
     - ./airflow/dags:/opt/airflow/dags
-    - airflow-logs:/opt/airflow/logs
+    - airflow-logs:/opt/airflow/logs                   # ✅ named volume cho logs
     - ./airflow/plugins:/opt/airflow/plugins
     - ./pipelines:/opt/airflow/dags/pipelines
     - ./data:/app/data
     - ./jars:/opt/bitnami/spark/extra-jars
     - ./configs:/opt/airflow/configs
     - ./spark-events:/tmp/spark-events
-    - ./docker/airflow/entrypoint.sh:/entrypoint.sh
+    - /home/ubuntu/de-pipeline/docker/airflow/entrypoint.sh:/entrypoint.sh  # ✅ custom entrypoint
   networks:
     - de-network
   restart: unless-stopped
@@ -42,13 +40,13 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
       interval: 10s
-      retries: "5"
+      retries: 5
 
   airflow-webserver:
     <<: *airflow-common
     image: de-airflow-webserver:2.8.1
     container_name: airflow-webserver
-    entrypoint: ["/entrypoint.sh"]
+    entrypoint: ["/entrypoint.sh"]   # ✅ gọi script custom
     command: webserver
     user: "50000:0"
     ports:
@@ -58,13 +56,13 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
       interval: 30s
-      retries: "5"
+      retries: 5
 
   airflow-scheduler:
     <<: *airflow-common
     image: de-airflow-webserver:2.8.1
     container_name: airflow-scheduler
-    entrypoint: ["/entrypoint.sh"]
+    entrypoint: ["/entrypoint.sh"]   # ✅ gọi script custom
     command: scheduler
     user: "50000:0"
 
@@ -129,7 +127,9 @@ services:
     environment:
       - SPARK_HISTORY_OPTS=-Dspark.history.fs.logDirectory=/tmp/spark-events -Dspark.history.ui.port=18080
     command: >
-      bash -c " /opt/bitnami/spark/bin/spark-class org.apache.spark.deploy.history.HistoryServer "
+      bash -c "
+        /opt/bitnami/spark/bin/spark-class org.apache.spark.deploy.history.HistoryServer
+      "
     ports:
       - "18080:18080"
     volumes:
