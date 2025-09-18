@@ -110,13 +110,11 @@ with DAG(
 
             # AWS creds for driver & executor
             "spark.driverEnv.AWS_ACCESS_KEY_ID": "{{ var.value.AWS_ACCESS_KEY_ID }}",
-            "spark.driverEnv.AWS_SECRET_ACCESS_KEY": "{{ var.value.AWS_SECRET_ACCESS_KEY }}",
-            "spark.driverEnv.AWS_SESSION_TOKEN": "{{ var.value.AWS_SESSION_TOKEN | default('') }}",
+            "spark.driverEnv.AWS_SECRET_ACCESS_KEY": "{{ var.value.AWS_SECRET_ACCESS_KEY }}",    
             "spark.driverEnv.AWS_REGION": "ap-southeast-1",
 
             "spark.executorEnv.AWS_ACCESS_KEY_ID": "{{ var.value.AWS_ACCESS_KEY_ID }}",
             "spark.executorEnv.AWS_SECRET_ACCESS_KEY": "{{ var.value.AWS_SECRET_ACCESS_KEY }}",
-            "spark.executorEnv.AWS_SESSION_TOKEN": "{{ var.value.AWS_SESSION_TOKEN | default('') }}",
             "spark.executorEnv.AWS_REGION": "ap-southeast-1",
         },
     )
