@@ -83,7 +83,7 @@ with DAG(
     run_transform = SparkSubmitOperator(
         task_id="run_transform",
         application="/opt/airflow/dags/pipelines/transform_spark.py",
-        conn_id="spark_default",
+        
         verbose=True,
         jars="/opt/bitnami/spark/extra-jars/hadoop-aws-3.3.4.jar,"
              "/opt/bitnami/spark/extra-jars/aws-java-sdk-bundle-1.12.262.jar,"
@@ -109,13 +109,13 @@ with DAG(
             "spark.hadoop.fs.s3a.committer.staging.abort.pending_uploads": "true",
 
             # AWS creds for driver & executor
-            "spark.driverEnv.AWS_ACCESS_KEY_ID": "{{ var.value.AWS_ACCESS_KEY_ID }}",
-            "spark.driverEnv.AWS_SECRET_ACCESS_KEY": "{{ var.value.AWS_SECRET_ACCESS_KEY }}",    
-            "spark.driverEnv.AWS_REGION": "ap-southeast-1",
+            "spark.driverEnv.AWS_ACCESS_KEY_ID": os.getenv("AWS_ACCESS_KEY_ID"),
+            "spark.driverEnv.AWS_SECRET_ACCESS_KEY": os.getenv("AWS_SECRET_ACCESS_KEY"),
+            "spark.driverEnv.AWS_REGION": os.getenv("AWS_REGION", "ap-southeast-1"),
 
-            "spark.executorEnv.AWS_ACCESS_KEY_ID": "{{ var.value.AWS_ACCESS_KEY_ID }}",
-            "spark.executorEnv.AWS_SECRET_ACCESS_KEY": "{{ var.value.AWS_SECRET_ACCESS_KEY }}",
-            "spark.executorEnv.AWS_REGION": "ap-southeast-1",
+            "spark.executorEnv.AWS_ACCESS_KEY_ID": os.getenv("AWS_ACCESS_KEY_ID"),
+            "spark.executorEnv.AWS_SECRET_ACCESS_KEY": os.getenv("AWS_SECRET_ACCESS_KEY"),
+            "spark.executorEnv.AWS_REGION": os.getenv("AWS_REGION", "ap-southeast-1"),      
         },
     )
 

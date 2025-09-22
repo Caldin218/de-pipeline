@@ -8,13 +8,12 @@ x-airflow-common: &airflow-common
     - AIRFLOW__CORE__FERNET_KEY=${FERNET_KEY}  
     - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=false
     - AIRFLOW__CORE__LOAD_EXAMPLES=false
-    - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=${AIRFLOW__DATABASE__SQL_ALCHEMY_CONN}
     - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
   volumes:
     - ./airflow/dags:/opt/airflow/dags
     - airflow-logs:/opt/airflow/logs                   # ✅ named volume cho logs
     - ./airflow/plugins:/opt/airflow/plugins
-    - ./pipelines:/opt/airflow/dags/pipelines
+    - ./pipelines:/opt/pipelines
     - ./data:/app/data
     - ./jars:/opt/bitnami/spark/extra-jars
     - ./configs:/opt/airflow/configs
@@ -27,7 +26,7 @@ x-airflow-common: &airflow-common
 services:
   postgres:
     image: postgres:14
-    container_name: airflow-postgres
+    container_name: postgres
     environment:
       - POSTGRES_USER=airflow
       - POSTGRES_PASSWORD=airflow
@@ -90,6 +89,7 @@ services:
       - ./data:/app/data
       - ./airflow/dags/pipelines:/opt/airflow/dags/pipelines
       - ./configs:/opt/airflow/configs
+      - ./pipelines:/opt/pipelines
       - ./spark-events:/tmp/spark-events
     networks:
       - de-network
@@ -118,7 +118,7 @@ services:
     volumes:
       - ./jars:/opt/bitnami/spark/extra-jars
       - ./data:/app/data
-      - ./pipelines:/opt/airflow/dags/pipelines
+      - ./pipelines:/opt/pipelines
       - ./configs:/opt/airflow/configs
       - ./spark-events:/tmp/spark-events
     networks:
