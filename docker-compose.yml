@@ -9,16 +9,20 @@ x-airflow-common: &airflow-common
     - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=false
     - AIRFLOW__CORE__LOAD_EXAMPLES=false
     - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
+    # ✅ thêm heartbeat tránh bị kill
+    - AIRFLOW__SCHEDULER__TASK_HEARTBEAT_SEC=60
+    - AIRFLOW__SCHEDULER__SCHEDULER_HEARTBEAT_SEC=60
+    - AIRFLOW__CORE__KILLED_TASK_CLEANUP_TIME=120
   volumes:
     - ./airflow/dags:/opt/airflow/dags
-    - airflow-logs:/opt/airflow/logs                   # ✅ named volume cho logs
+    - airflow-logs:/opt/airflow/logs
     - ./airflow/plugins:/opt/airflow/plugins
-    - ./pipelines:/opt/pipelines
+    - ./airflow/dags/pipelines:/opt/airflow/dags/pipelines  # ✅ giữ 1 path duy nhất cho pipelines
     - ./data:/app/data
     - ./jars:/opt/bitnami/spark/extra-jars
     - ./configs:/opt/airflow/configs
     - ./spark-events:/tmp/spark-events
-    - /home/ubuntu/de-pipeline/docker/airflow/entrypoint.sh:/entrypoint.sh  # ✅ custom entrypoint
+    - /home/ubuntu/de-pipeline/docker/airflow/entrypoint.sh:/entrypoint.sh
   networks:
     - de-network
   restart: unless-stopped
@@ -41,13 +45,14 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
       interval: 10s
+      timeout: 5s
       retries: 5
 
   airflow-webserver:
     <<: *airflow-common
     image: de-airflow-webserver:2.8.1
     container_name: airflow-webserver
-    entrypoint: ["/entrypoint.sh"]   # ✅ gọi script custom
+    entrypoint: ["/entrypoint.sh"]
     command: webserver
     user: "50000:0"
     ports:
@@ -58,14 +63,20 @@ services:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
       interval: 30s
       retries: 5
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   airflow-scheduler:
     <<: *airflow-common
     image: de-airflow-webserver:2.8.1
     container_name: airflow-scheduler
-    entrypoint: ["/entrypoint.sh"]   # ✅ gọi script custom
+    entrypoint: ["/entrypoint.sh"]
     command: scheduler
     user: "50000:0"
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   spark-master:
     build:
@@ -89,7 +100,6 @@ services:
       - ./data:/app/data
       - ./airflow/dags/pipelines:/opt/airflow/dags/pipelines
       - ./configs:/opt/airflow/configs
-      - ./pipelines:/opt/pipelines
       - ./spark-events:/tmp/spark-events
     networks:
       - de-network
@@ -118,7 +128,7 @@ services:
     volumes:
       - ./jars:/opt/bitnami/spark/extra-jars
       - ./data:/app/data
-      - ./pipelines:/opt/pipelines
+      - ./airflow/dags/pipelines:/opt/airflow/dags/pipelines
       - ./configs:/opt/airflow/configs
       - ./spark-events:/tmp/spark-events
     networks:

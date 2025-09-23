@@ -1,30 +1,46 @@
 FROM apache/airflow:2.8.1-python3.11
 
+# ===================== #
+# 1. Cài Java + Spark   #
+# ===================== #
 USER root
 
-# Java + Spark
+# Cài Java và tool cơ bản
 RUN apt-get update && \
-    apt-get install -y openjdk-17-jdk curl && \
-    rm -rf /var/lib/apt/lists/* && \
-    curl -L https://archive.apache.org/dist/spark/spark-3.5.0/spark-3.5.0-bin-hadoop3.tgz \
-    | tar -xz -C /opt/ && \
-    ln -s /opt/spark-3.5.0-bin-hadoop3 /opt/spark
+    apt-get install -y openjdk-17-jdk curl wget tar && \
+    rm -rf /var/lib/apt/lists/*
 
-# ✅ FIX LOG PERMISSION: tạo thư mục logs & chown cho airflow user (50000)
+# === CÁCH 1 (hiện tại bạn dùng): tải Spark từ Apache (lâu)
+# RUN curl -L https://archive.apache.org/dist/spark/spark-3.5.0/spark-3.5.0-bin-hadoop3.tgz \
+#     | tar -xz -C /opt/ && \
+#     ln -s /opt/spark-3.5.0-bin-hadoop3 /opt/spark
+
+# === CÁCH 2 (khuyên dùng): tải Spark 1 lần ngoài host rồi copy vào image
+# Giả sử bạn đã tải spark-3.5.0-bin-hadoop3.tgz về D:\DE
+COPY spark-3.5.0-bin-hadoop3.tgz /tmp/
+RUN tar -xzf /tmp/spark-3.5.0-bin-hadoop3.tgz -C /opt/ && \
+    ln -s /opt/spark-3.5.0-bin-hadoop3 /opt/spark && \
+    rm /tmp/spark-3.5.0-bin-hadoop3.tgz
+
+# Biến môi trường Spark
+ENV SPARK_HOME=/opt/spark
+ENV PATH=$SPARK_HOME/bin:$PATH
+
+# ===================== #
+# 2. Airflow setup      #
+# ===================== #
 RUN mkdir -p /opt/airflow/logs && \
     chown -R 50000:0 /opt/airflow/logs && \
     chmod -R 775 /opt/airflow/logs
 
-ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
-ENV PATH="${JAVA_HOME}/bin:/opt/spark/bin:${PATH}"
-
 # Copy requirements
 COPY requirements-airflow.txt /requirements.txt
-
-# Đổi sang user airflow để cài pip package
-USER airflow
+USER 50000
 RUN pip install --no-cache-dir --no-deps -r /requirements.txt
 
-# Copy custom entrypoint
+# Copy entrypoint script
+USER root
 COPY docker/airflow/entrypoint.sh /opt/airflow/entrypoint.sh
 RUN chmod +x /opt/airflow/entrypoint.sh
+
+USER 50000
