@@ -20,10 +20,18 @@ COUNT_OUTPUT = os.getenv("METRICS_COUNTS", "0") == "1"  # đặt 1 để đếm 
 
 # ==========================================================================
 # INFRA / BOOTSTRAP
-# =======================================================================
+# ==========================================================================
+def resolve_path(path_str, do_mkdir=False):
+    """Trả về Path nếu local, string nếu s3a://"""
+    if str(path_str).startswith("s3a://"):
+        return str(path_str)
+    p = pathlib.Path(path_str).absolute()
+    if do_mkdir:
+        p.mkdir(parents=True, exist_ok=True)
+    return p
+
 def bootstrap():
     BASE_DIR    = Path(__file__).resolve().parent
-    # ==== CHỈ SỬA 2 DÒNG DƯỚI: ưu tiên ENV CONFIG_PATH, mặc định /opt/airflow/configs/config.yaml
     CONFIG_FILE = Path(os.getenv("CONFIG_PATH", "/opt/airflow/configs/config.yaml"))
 
     print(f"[DEBUG] __file__     : {__file__}")
@@ -41,17 +49,16 @@ def bootstrap():
         print(f"{k}: {v}")
     print("======================HEHEHEHEHE===========")
 
-    # [NEW] lazy-import pyspark để Airflow parser không cần pyspark khi chỉ import file
+    # [NEW] lazy-import pyspark
     global SparkSession, F
     from pyspark.sql import SparkSession as _SparkSession
     from pyspark.sql import functions as _F
     SparkSession = _SparkSession
     F = _F
 
-    BRONZE = pathlib.Path(CFG["paths"]["bronze"]).absolute()
-    SILVER = pathlib.Path(CFG["paths"]["silver"]).absolute()
-    SILVER.mkdir(parents=True, exist_ok=True)
-    REF    = pathlib.Path(CFG["paths"]["reference"]).absolute()
+    BRONZE = resolve_path(CFG["paths"]["bronze"], do_mkdir=True)
+    SILVER = resolve_path(CFG["paths"]["silver"], do_mkdir=True)
+    REF    = resolve_path(CFG["paths"]["reference"], do_mkdir=True)
 
     spark_builder = (
         SparkSession.builder
@@ -79,7 +86,6 @@ def bootstrap():
         .config("spark.hadoop.fs.s3a.fast.upload.buffer", "array")
         .config("spark.local.dir", "/tmp/spark")
         .config("spark.hadoop.hadoop.tmp.dir", "/tmp/spark")
-
         # ⭐ Bật event log để History Server đọc
         .config("spark.eventLog.enabled", "true")
         .config("spark.eventLog.dir", "file:///tmp/spark-events")
@@ -108,9 +114,9 @@ def bootstrap():
 
     return CFG, BRONZE, SILVER, REF, spark, RUN_DATE
 
-# =======================================================================
+# ==========================================================================
 # MAIN LOGIC
-# =======================================================================
+# ==========================================================================
 def main():
     CFG, BRONZE, SILVER, REF, spark, RUN_DATE = bootstrap()
 
@@ -184,13 +190,14 @@ def main():
     )
 
     # Save locally (silver layer) — GIỮ NGUYÊN
-    daily_orders.toPandas().to_csv(SILVER / "daily_orders.csv", index=False, encoding="utf-8")
-    dau.toPandas().to_csv(SILVER / "daily_active_users.csv", index=False, encoding="utf-8")
-    dau_ch.toPandas().to_csv(SILVER / "daily_active_users_by_channel.csv", index=False, encoding="utf-8")
-    rev_ch.toPandas().to_csv(SILVER / "daily_revenue_by_channel.csv", index=False, encoding="utf-8")
-    conv.toPandas().to_csv(SILVER / "daily_conversion.csv", index=False, encoding="utf-8")
+    if not str(SILVER).startswith("s3a://"):
+        daily_orders.toPandas().to_csv(Path(SILVER) / "daily_orders.csv", index=False, encoding="utf-8")
+        dau.toPandas().to_csv(Path(SILVER) / "daily_active_users.csv", index=False, encoding="utf-8")
+        dau_ch.toPandas().to_csv(Path(SILVER) / "daily_active_users_by_channel.csv", index=False, encoding="utf-8")
+        rev_ch.toPandas().to_csv(Path(SILVER) / "daily_revenue_by_channel.csv", index=False, encoding="utf-8")
+        conv.toPandas().to_csv(Path(SILVER) / "daily_conversion.csv", index=False, encoding="utf-8")
 
-    # Save to S3 — GIỮ NGUYÊN (CSV partitioned)
+    # Save to S3 — GIỮ NGUYÊN
     tables = {
         "daily_orders": {
             "df": daily_orders,
@@ -230,7 +237,6 @@ def main():
         s3_path = props["s3_path"]
         partition_cols = props["partition_cols"]
 
-        # optional count rows for metrics (không bắt buộc)
         rows_out = None
         if COUNT_OUTPUT:
             try:
@@ -247,29 +253,26 @@ def main():
           .option("header", True) \
           .csv(s3_path)
 
-        print(f"[transform_spark] wrote {name} to S3 at {s3_path}, partitioned by {partition_cols}")  # GIỮ NGUYÊN
-        # Log JSON per table
+        print(f"[transform_spark] wrote {name} to S3 at {s3_path}, partitioned by {partition_cols}")
         log.info(json.dumps({
             "stage":"transform","event":"write_done","run_date":str(RUN_DATE) if RUN_DATE else None,
             "table":name,"partition_cols":partition_cols,"rows_out":rows_out,"path":s3_path
         }, ensure_ascii=False))
         written.append(name)
 
-    print(f"[transform_spark] wrote silver CSVs for RUN_DATE={RUN_DATE or 'ALL'}")  # GIỮ NGUYÊN
+    print(f"[transform_spark] wrote silver CSVs for RUN_DATE={RUN_DATE or 'ALL'}")
 
-    # Banner — GIỮ NGUYÊN
     import pyfiglet
     banner = pyfiglet.figlet_format("FINISH")
     print(banner)
 
-    # DONE summary
     log.info(json.dumps({
         "stage":"transform","event":"done","run_date":str(RUN_DATE) if RUN_DATE else None,
         "tables_written":written,"duration_s":round(time.time()-_t0,2)
     }, ensure_ascii=False))
 
-# =======================================================================
+# ==========================================================================
 # ENTRY
-# =======================================================================
+# ==========================================================================
 if __name__ == "__main__":
     main()

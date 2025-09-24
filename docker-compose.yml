@@ -17,7 +17,7 @@ x-airflow-common: &airflow-common
     - ./airflow/dags:/opt/airflow/dags
     - airflow-logs:/opt/airflow/logs
     - ./airflow/plugins:/opt/airflow/plugins
-    - ./airflow/dags/pipelines:/opt/airflow/dags/pipelines  # ✅ giữ 1 path duy nhất cho pipelines
+    - ./pipelines:/opt/airflow/dags/pipelines 
     - ./data:/app/data
     - ./jars:/opt/bitnami/spark/extra-jars
     - ./configs:/opt/airflow/configs
@@ -98,7 +98,7 @@ services:
     volumes:
       - ./jars:/opt/bitnami/spark/extra-jars
       - ./data:/app/data
-      - ./airflow/dags/pipelines:/opt/airflow/dags/pipelines
+      - ./pipelines:/opt/airflow/dags/pipelines
       - ./configs:/opt/airflow/configs
       - ./spark-events:/tmp/spark-events
     networks:
@@ -128,7 +128,7 @@ services:
     volumes:
       - ./jars:/opt/bitnami/spark/extra-jars
       - ./data:/app/data
-      - ./airflow/dags/pipelines:/opt/airflow/dags/pipelines
+      - ./pipelines:/opt/airflow/dags/pipelines
       - ./configs:/opt/airflow/configs
       - ./spark-events:/tmp/spark-events
     networks:
