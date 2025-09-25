@@ -50,6 +50,9 @@ services:
 
   airflow-webserver:
     <<: *airflow-common
+    build:
+     context: .
+     dockerfile: Dockerfile.airflow
     image: de-airflow-webserver:2.8.1
     container_name: airflow-webserver
     entrypoint: ["/entrypoint.sh"]
@@ -73,6 +76,9 @@ services:
 
   airflow-scheduler:
     <<: *airflow-common
+    build:
+     context: .
+     dockerfile: Dockerfile.airflow
     image: de-airflow-webserver:2.8.1
     container_name: airflow-scheduler
     entrypoint: ["/entrypoint.sh"]
