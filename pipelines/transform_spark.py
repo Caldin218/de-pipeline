@@ -123,15 +123,24 @@ def main():
     # [NEW] log START (JSON)
     log.info(json.dumps({"stage":"transform","event":"start","run_date":str(RUN_DATE) if RUN_DATE else None}, ensure_ascii=False))
 
-    order_files = glob.glob(str(BRONZE / "orders_*.csv"))
-    event_files = glob.glob(str(BRONZE / "events_*.csv"))
+    if RUN_DATE:
+        order_path = f"{BRONZE}/orders_{RUN_DATE}.csv"
+        event_path = f"{BRONZE}/events_{RUN_DATE}.csv"
+    else:
+        order_path = f"{BRONZE}/orders_*.csv"
+        event_path = f"{BRONZE}/events_*.csv"
+    
+    print(f"[INFO] Reading orders from {order_path}")
+    print(f"[INFO] Reading events from {event_path}")
+   
+    
+    # Đọc trực tiếp từ S3 (Spark tự handle)
+    orders = spark.read.csv(order_path, header=True, inferSchema=True)
+    events = spark.read.csv(event_path, header=True, inferSchema=True)
 
-    print("Order files:", order_files)
-    print("Event files:", event_files)
+    # reference vẫn local
+    users = spark.read.csv((REF / "users.csv").as_posix(), header=True, inferSchema=True)
 
-    orders = spark.read.csv(order_files, header=True, inferSchema=True)
-    events = spark.read.csv(event_files, header=True, inferSchema=True)
-    users  = spark.read.csv((REF / "users.csv").as_posix(), header=True, inferSchema=True)
 
     orders = orders.withColumn("order_ts", F.to_timestamp("order_ts"))
     events = events.withColumn("ts", F.to_timestamp("ts"))

@@ -51,8 +51,8 @@ services:
   airflow-webserver:
     <<: *airflow-common
     build:
-     context: .
-     dockerfile: Dockerfile.airflow
+      context: .
+      dockerfile: Dockerfile.airflow
     image: de-airflow-webserver:2.8.1
     container_name: airflow-webserver
     entrypoint: ["/entrypoint.sh"]
@@ -60,12 +60,12 @@ services:
     user: "50000:0"
     ports:
       - "8080:8080"
+    extra_hosts:
+      - "spark-master:172.18.0.2"   # ✅ sửa lại, bỏ khoảng trắng
     environment:
       - AIRFLOW__WEBSERVER__WEB_SERVER_HOST=0.0.0.0
     networks:
-      de-network:
-        aliases:
-          - spark-master   # ✅ thêm alias để resolve được spark-master
+      - de-network
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
       interval: 30s
@@ -77,17 +77,17 @@ services:
   airflow-scheduler:
     <<: *airflow-common
     build:
-     context: .
-     dockerfile: Dockerfile.airflow
+      context: .
+      dockerfile: Dockerfile.airflow
     image: de-airflow-webserver:2.8.1
     container_name: airflow-scheduler
+    extra_hosts:
+      - "spark-master:172.18.0.2"   # ✅ sửa lại, bỏ khoảng trắng
     entrypoint: ["/entrypoint.sh"]
     command: scheduler
     user: "50000:0"
     networks:
-      de-network:
-        aliases:
-          - spark-master   # ✅ thêm alias để resolve được spark-master
+      - de-network
     depends_on:
       postgres:
         condition: service_healthy
@@ -118,7 +118,8 @@ services:
       - ./configs:/opt/airflow/configs
       - ./spark-events:/tmp/spark-events
     networks:
-      - de-network
+      de-network:
+        ipv4_address: 172.18.0.2   # ✅ cố định IP
     restart: unless-stopped
 
   spark-worker:
@@ -175,3 +176,6 @@ volumes:
 networks:
   de-network:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.18.0.0/16   # ✅ fix subnet để dùng ipv4_address

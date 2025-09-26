@@ -3,10 +3,10 @@ warehouse:
   database: data/warehouse.sqlite
 
 paths:
-  raw: /app/data/raw
-  bronze: /app/data/bronze
+  raw: s3a://de-pipeline-test-853409708/raw
+  bronze: s3a://de-pipeline-test-853409708/bronze
   silver: s3a://de-pipeline-test-853409708/silver
-  reference: /app/data/reference
+  reference: /app/data/reference #local
 
 pipeline:
   days_back: 7

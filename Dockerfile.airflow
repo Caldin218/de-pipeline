@@ -2,14 +2,23 @@ FROM apache/airflow:2.8.1-python3.11
 
 USER root
 
-# Cài Java và tool cơ bản
+# 1. Java + tool cơ bản
 RUN apt-get update && \
     apt-get install -y openjdk-17-jdk curl wget tar netcat-openbsd && \
     rm -rf /var/lib/apt/lists/*
 
-# ===================== #
-# Airflow setup
-# ===================== #
+# 2. Cài Spark client
+COPY spark-3.5.0-bin-hadoop3.tgz /tmp/
+RUN tar -xzf /tmp/spark-3.5.0-bin-hadoop3.tgz -C /opt/ && \
+    ln -s /opt/spark-3.5.0-bin-hadoop3 /opt/spark && \
+    rm /tmp/spark-3.5.0-bin-hadoop3.tgz && \
+    chown -R 50000:0 /opt/spark && \
+    chmod -R 755 /opt/spark
+
+ENV SPARK_HOME=/opt/spark
+ENV PATH=$SPARK_HOME/bin:$PATH
+
+# 3. Airflow setup
 RUN mkdir -p /opt/airflow/logs && \
     chown -R 50000:0 /opt/airflow/logs && \
     chmod -R 775 /opt/airflow/logs
@@ -18,6 +27,7 @@ COPY requirements-airflow.txt /requirements.txt
 USER 50000
 RUN pip install --no-cache-dir --no-deps -r /requirements.txt
 
+# 4. Entrypoint
 USER root
 COPY docker/airflow/entrypoint.sh /opt/airflow/entrypoint.sh
 RUN chmod +x /opt/airflow/entrypoint.sh
