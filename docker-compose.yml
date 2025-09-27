@@ -60,8 +60,7 @@ services:
     user: "50000:0"
     ports:
       - "8080:8080"
-    extra_hosts:
-      - "spark-master:172.18.0.2"   # ✅ sửa lại, bỏ khoảng trắng
+   
     environment:
       - AIRFLOW__WEBSERVER__WEB_SERVER_HOST=0.0.0.0
     networks:
@@ -81,8 +80,7 @@ services:
       dockerfile: Dockerfile.airflow
     image: de-airflow-webserver:2.8.1
     container_name: airflow-scheduler
-    extra_hosts:
-      - "spark-master:172.18.0.2"   # ✅ sửa lại, bỏ khoảng trắng
+    
     entrypoint: ["/entrypoint.sh"]
     command: scheduler
     user: "50000:0"
@@ -118,8 +116,8 @@ services:
       - ./configs:/opt/airflow/configs
       - ./spark-events:/tmp/spark-events
     networks:
-      de-network:
-        ipv4_address: 172.18.0.2   # ✅ cố định IP
+      - de-network
+
     restart: unless-stopped
 
   spark-worker:
@@ -176,6 +174,3 @@ volumes:
 networks:
   de-network:
     driver: bridge
-    ipam:
-      config:
-        - subnet: 172.18.0.0/16   # ✅ fix subnet để dùng ipv4_address
