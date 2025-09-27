@@ -112,7 +112,7 @@ services:
     volumes:
       - ./jars:/opt/bitnami/spark/extra-jars
       - ./data:/app/data
-      - ./pipelines:/opt/airflow/dags/pipelines
+      - ./pipelines:/app/pipelines 
       - ./configs:/opt/airflow/configs
       - ./spark-events:/tmp/spark-events
     networks:
@@ -143,7 +143,7 @@ services:
     volumes:
       - ./jars:/opt/bitnami/spark/extra-jars
       - ./data:/app/data
-      - ./pipelines:/opt/airflow/dags/pipelines
+      - ./pipelines:/app/pipelines
       - ./configs:/opt/airflow/configs
       - ./spark-events:/tmp/spark-events
     networks:

@@ -40,7 +40,6 @@ spark_conf:
   spark.hadoop.fs.s3a.aws.credentials.provider: com.amazonaws.auth.EnvironmentVariableCredentialsProvider
   spark.hadoop.fs.s3a.endpoint: s3.ap-southeast-1.amazonaws.com
   spark.hadoop.fs.s3a.region: ap-southeast-1
-  
   spark.hadoop.fs.s3a.path.style.access: "true"   # an toàn, cứ bật
 
   # ĐẨY ENV xuống driver + executors (khớp với Compose)

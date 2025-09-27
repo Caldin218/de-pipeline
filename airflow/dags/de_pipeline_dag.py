@@ -96,9 +96,12 @@ with DAG(
 
             # S3A configs
             "spark.hadoop.fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem",
-            "spark.hadoop.fs.s3a.aws.credentials.provider": "com.amazonaws.auth.EnvironmentVariableCredentialsProvider",
-            "spark.hadoop.fs.s3a.endpoint": "s3.ap-southeast-1.amazonaws.com",
+            "spark.hadoop.fs.s3a.aws.credentials.provider": "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
+            "spark.hadoop.fs.s3a.access.key": os.getenv("AWS_ACCESS_KEY_ID"),
+            "spark.hadoop.fs.s3a.secret.key": os.getenv("AWS_SECRET_ACCESS_KEY"),
+            "spark.hadoop.fs.s3a.endpoint": "https://s3.ap-southeast-1.amazonaws.com",
             "spark.hadoop.fs.s3a.region": "ap-southeast-1",
+            "spark.hadoop.fs.s3a.path.style.access": "true",
 
             # Magic Committer configs
             "spark.sql.parquet.output.committer.class": "org.apache.hadoop.fs.s3a.commit.S3ACommitter",
@@ -115,7 +118,11 @@ with DAG(
 
             "spark.executorEnv.AWS_ACCESS_KEY_ID": os.getenv("AWS_ACCESS_KEY_ID"),
             "spark.executorEnv.AWS_SECRET_ACCESS_KEY": os.getenv("AWS_SECRET_ACCESS_KEY"),
-            "spark.executorEnv.AWS_REGION": os.getenv("AWS_REGION", "ap-southeast-1"),      
+            "spark.executorEnv.AWS_REGION": os.getenv("AWS_REGION", "ap-southeast-1"),
+
+            #set thêm để SparkSubmitOperator nạp đúng jar
+            "spark.driver.extraClassPath": "/opt/bitnami/spark/extra-jars/*",
+            "spark.executor.extraClassPath": "/opt/bitnami/spark/extra-jars/*", 
         },
     )
 
