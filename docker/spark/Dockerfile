@@ -6,13 +6,16 @@ USER root
 
 RUN apt-get update && \
     apt-get install -y python3 python3-pip && \
-    ln -s $(which python3) /usr/bin/python3.9 && \
+    ln -sf $(which python3) /usr/bin/python3.9 && \
     rm -rf /var/lib/apt/lists/*
 
-# Cài thêm libs Python cần cho pipeline
-RUN pip install --no-cache-dir pyspark==3.5.0 boto3 pyyaml
-
-# ✅ Cài pyspark (kèm py4j) + boto3 để Spark nói chuyện với AWS
-RUN pip3 install --no-cache-dir pyspark==3.5.0 boto3
+# Cài đầy đủ libs Python cho pipeline
+RUN pip install --no-cache-dir \
+    pyspark==3.5.0 \
+    boto3 \
+    pandas \
+    pyyaml \
+    pyarrow \
+    pyfiglet
 
 USER 1001
