@@ -85,23 +85,35 @@ with DAG(
         application="/opt/airflow/dags/pipelines/transform_spark.py",
         
         verbose=True,
-        jars="/opt/bitnami/spark/extra-jars/hadoop-aws-3.3.4.jar,"
-             "/opt/bitnami/spark/extra-jars/aws-java-sdk-bundle-1.12.262.jar,"
-             "/opt/bitnami/spark/extra-jars/hadoop-cloud-storage-3.3.4.jar,"
-             "/opt/bitnami/spark/extra-jars/hadoop-committer-3.3.4.jar",
+        jars=",".join([
+            "/opt/bitnami/spark/extra-jars/hadoop-aws-3.3.6.jar",
+            "/opt/bitnami/spark/extra-jars/aws-java-sdk-bundle-1.12.262.jar",
+            "/opt/bitnami/spark/extra-jars/hadoop-cloud-storage-3.3.6.jar",
+            "/opt/bitnami/spark/extra-jars/hadoop-common-3.3.6.jar", 
+            "/opt/bitnami/spark/extra-jars/woodstox-core-6.2.1.jar",   # ✅ mới
+            "/opt/bitnami/spark/extra-jars/stax2-api-4.2.1.jar",       # ✅ mới
+            "/opt/bitnami/spark/extra-jars/commons-configuration2-2.8.0.jar",   # ✅ mới
+            "/opt/bitnami/spark/extra-jars/commons-collections4-4.4.jar",       # ✅ mới
+            "/opt/bitnami/spark/extra-jars/re2j-1.7.jar",
+        ]), 
+
         application_args=["--run_date", "{{ ds }}"],  # SparkSubmitOperator hỗ trợ templating
         conf={
             "spark.master": "spark://spark-master:7077",
             "spark.submit.deployMode": "client",
 
+            # Dùng IAM Role qua Instance Metadata
+            "spark.hadoop.fs.s3a.aws.credentials.provider": "com.amazonaws.auth.InstanceProfileCredentialsProvider",
+
+
+
+
             # S3A configs
             "spark.hadoop.fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem",
-            "spark.hadoop.fs.s3a.aws.credentials.provider": "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
-            "spark.hadoop.fs.s3a.access.key": os.getenv("AWS_ACCESS_KEY_ID"),
-            "spark.hadoop.fs.s3a.secret.key": os.getenv("AWS_SECRET_ACCESS_KEY"),
-            "spark.hadoop.fs.s3a.endpoint": "https://s3.ap-southeast-1.amazonaws.com",
+            "spark.hadoop.fs.s3a.endpoint": "s3.ap-southeast-1.amazonaws.com",
             "spark.hadoop.fs.s3a.region": "ap-southeast-1",
             "spark.hadoop.fs.s3a.path.style.access": "true",
+            
 
             # Magic Committer configs
             "spark.sql.parquet.output.committer.class": "org.apache.hadoop.fs.s3a.commit.S3ACommitter",
@@ -111,14 +123,7 @@ with DAG(
             "spark.hadoop.fs.s3a.committer.staging.conflict-mode": "replace",
             "spark.hadoop.fs.s3a.committer.staging.abort.pending_uploads": "true",
 
-            # AWS creds for driver & executor
-            "spark.driverEnv.AWS_ACCESS_KEY_ID": os.getenv("AWS_ACCESS_KEY_ID"),
-            "spark.driverEnv.AWS_SECRET_ACCESS_KEY": os.getenv("AWS_SECRET_ACCESS_KEY"),
-            "spark.driverEnv.AWS_REGION": os.getenv("AWS_REGION", "ap-southeast-1"),
-
-            "spark.executorEnv.AWS_ACCESS_KEY_ID": os.getenv("AWS_ACCESS_KEY_ID"),
-            "spark.executorEnv.AWS_SECRET_ACCESS_KEY": os.getenv("AWS_SECRET_ACCESS_KEY"),
-            "spark.executorEnv.AWS_REGION": os.getenv("AWS_REGION", "ap-southeast-1"),
+           
 
             #set thêm để SparkSubmitOperator nạp đúng jar
             "spark.driver.extraClassPath": "/opt/bitnami/spark/extra-jars/*",
