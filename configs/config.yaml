@@ -37,22 +37,9 @@ s3:
 
 spark_conf:
   spark.hadoop.fs.s3a.impl: org.apache.hadoop.fs.s3a.S3AFileSystem
-  spark.hadoop.fs.s3a.aws.credentials.provider: com.amazonaws.auth.EnvironmentVariableCredentialsProvider
   spark.hadoop.fs.s3a.endpoint: s3.ap-southeast-1.amazonaws.com
   spark.hadoop.fs.s3a.region: ap-southeast-1
   spark.hadoop.fs.s3a.path.style.access: "true"   # an toàn, cứ bật
-
-  # ĐẨY ENV xuống driver + executors (khớp với Compose)
-  spark.driverEnv.AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-  spark.driverEnv.AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
-  spark.driverEnv.AWS_REGION: ${AWS_REGION}
-
-  # ĐẨY ENV xuống executors (khớp với Compose)
-  spark.executorEnv.AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-  spark.executorEnv.AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
-  spark.executorEnv.AWS_REGION: ${AWS_REGION}  # dùng AWS_REGION
-  # (giữ thêm dòng này nếu ông thích – nhưng phải có giá trị)
-  # spark.executorEnv.AWS_DEFAULT_REGION: ${AWS_REGION}
 
   # Timeout/retry giữ nguyên
   spark.hadoop.fs.s3a.connection.timeout: "60000"
