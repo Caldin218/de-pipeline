@@ -104,9 +104,8 @@ with DAG(
 
             # Dùng IAM Role qua Instance Metadata
             "spark.hadoop.fs.s3a.aws.credentials.provider": "com.amazonaws.auth.InstanceProfileCredentialsProvider",
-
-
-
+            "spark.driver.extraJavaOptions": "-Dcom.amazonaws.services.s3.enableV4",
+            "spark.executor.extraJavaOptions": "-Dcom.amazonaws.services.s3.enableV4",
 
             # S3A configs
             "spark.hadoop.fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem",
