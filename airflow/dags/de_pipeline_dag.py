@@ -111,18 +111,7 @@ with DAG(
             "spark.hadoop.fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem",
             "spark.hadoop.fs.s3a.endpoint": "s3.ap-southeast-1.amazonaws.com",
             "spark.hadoop.fs.s3a.region": "ap-southeast-1",
-            "spark.hadoop.fs.s3a.path.style.access": "true",
-            
-
-            # Magic Committer configs
-            "spark.sql.parquet.output.committer.class": "org.apache.hadoop.fs.s3a.commit.S3ACommitter",
-            "mapreduce.outputcommitter.factory.scheme.s3a": "org.apache.hadoop.fs.s3a.commit.S3ACommitterFactory",
-            "spark.hadoop.fs.s3a.committer.name": "magic",
-            "spark.hadoop.fs.s3a.committer.magic.enabled": "true",
-            "spark.hadoop.fs.s3a.committer.staging.conflict-mode": "replace",
-            "spark.hadoop.fs.s3a.committer.staging.abort.pending_uploads": "true",
-
-           
+            "spark.hadoop.fs.s3a.path.style.access": "true",          
 
             #set thêm để SparkSubmitOperator nạp đúng jar
             "spark.driver.extraClassPath": "/opt/bitnami/spark/extra-jars/*",
